@@ -1,6 +1,5 @@
 FROM kylemanna/openvpn
 
-
 RUN apk update  && \
     apk add vim net-tools openssh bind-tools busybox-extras
 
@@ -12,3 +11,4 @@ COPY .container/conf/openvpn.conf /opt/openvpn/openvpn.conf
 COPY .container/conf/ovpn_env.sh /opt/openvpn/ovpn_env.sh
 COPY .container/conf/ccd /opt/openvpn/ccd
 
+RUN rm -rf /var/lib/apt/lists/*
