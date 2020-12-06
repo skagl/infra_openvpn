@@ -1,0 +1,57 @@
+name: CI
+
+on: 
+  push:
+    branches:
+      - master
+
+jobs:
+  release-on-push:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      IMAGE_NAME: infra_openvpn
+      REGISTRY_NAME: registry.skagl.ru
+    steps:
+      - id: release
+        uses: rymndhng/release-on-push-action@master
+        with:
+          bump_version_scheme: patch
+          
+      - id: version
+        run: |
+          IMAGE_ID=$REGISTRY_NAME/$IMAGE_NAME
+
+          # Change all uppercase to lowercase
+          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+          
+          VERSION=${{ steps.release.outputs.tag_name }}
+          VERSION=$(echo $VERSION | sed -e 's/^v//')
+          
+          echo IMAGE_ID=$IMAGE_ID
+          echo VERSION=$VERSION
+          
+          echo ::set-output name=version::$VERSION
+          echo ::set-output name=image_id::$IMAGE_ID
+
+      - uses: actions/checkout@v2
+        with:
+          ref: "${{ steps.release.outputs.tag_name }}"  
+
+      - name: Build image
+        run: |
+          echo "VERSION=${{ steps.version.outputs.version }}"
+          echo "IMAGE_ID=${{ steps.version.outputs.image_id }}"
+          docker build . --file Dockerfile --tag ${{ steps.version.outputs.image_id }}:${{ steps.version.outputs.version }}
+
+      - name: Log into registry
+        run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login registry.skagl.ru -u ${{ secrets.REGISTRY_USER }} --password-stdin
+
+      - name: Push image
+        run: |
+          IMAGE_ID=${{ steps.version.outputs.image_id }}
+          VERSION=${{ steps.version.outputs.version }}
+          docker tag $IMAGE_ID:$VERSION $IMAGE_ID:latest
+          docker push $IMAGE_ID:$VERSION
+          docker push $IMAGE_ID:latest
